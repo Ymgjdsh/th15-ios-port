@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/port-icon.svg" alt="TH15 iOS port" width="180">
+  <img src="docs/app-icon.png" alt="TH15 iOS port" width="180">
 </p>
 
 # TH15 iOS Port
@@ -80,6 +80,6 @@ See [ios/VALIDATION.md](ios/VALIDATION.md) for completed checks and remaining li
 
 ## Assets and licensing
 
-No original game executable, archives, music, generated fonts, replays, saves or IPA are included. Build runnable packages locally from inputs you are entitled to use. The documentation icon is a simple port mark; the private application icon is extracted from the original executable.
+No original game executable, archives, music, generated fonts, replays, saves or IPA are included. Build runnable packages locally from inputs you are entitled to use. The README and private application icon are extracted from the original th15.exe. The README includes only the icon preview, not the game resources.
 
 Licensing is component-specific: the reconstruction and port source use the [MIT license](LICENSE); SDL3, miniaudio and stb retain their notices under [ios/licenses](ios/licenses) and the bundled component headers. Original game resources and Windows fonts retain their respective rights. Do not apply the source license to those resources.
