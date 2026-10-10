@@ -183,7 +183,7 @@ final class Verify: XCTestCase {
         XCTAssertEqual(element.frame.midY, frame.midY, accuracy: 3)
     }
     func testAutoBombTogglesAndLayout() {
-        launch(["--stage", "1"]); wait("width=768 height=1024")
+        launch(["--stage", "1", "--reset-native-settings"]); app.launchArguments=["--ui-test","--stage","1"]; wait("width=768 height=1024")
         openSettings(); setSwitch("autoFire", false); setSwitch("autoSlow", false)
         setSwitch("autoBomb", true); setSwitch("toggleFire", true); setSwitch("toggleSlow", true)
         closeSettings(); wait("autoBomb=1 "); wait("context=1 ", timeout:60); wait("pause=0 ", timeout:60)

@@ -243,6 +243,17 @@ static void buttonAppearance(UIButton* button,bool held){
     const BOOL hidden=touhou::ios::preference(@"hidden")&&sdl_controls_gameplay()&&!self.editingLayout;self.joystick.hidden=hidden;self.joystick.alpha=self.editingLayout?1:touhou::ios::preference(@"opacity");
     for(NSUInteger i=0;i<self.buttons.count;i++){UIButton* button=self.buttons[i];if(i<3)button.hidden=hidden;if(i==5)button.hidden=!self.editingLayout&&(!touhou::ios::preference(@"developer")||!sdl_developer_available());button.alpha=self.editingLayout?1:touhou::ios::preference(@"opacity");}
     if(self.editingLayout){self.layoutToolbar.frame=CGRectMake(self.safeAreaInsets.left,self.safeAreaInsets.top,self.bounds.size.width-self.safeAreaInsets.left-self.safeAreaInsets.right,88);self.layoutHint.frame=CGRectMake(4,3,self.layoutToolbar.bounds.size.width-8,28);CGFloat w=self.layoutToolbar.bounds.size.width/3;for(UIButton* tool in self.layoutToolbar.subviews)if([tool isKindOfClass:UIButton.class])tool.frame=CGRectMake(w*tool.tag,34,w,48);[self bringSubviewToFront:self.layoutToolbar];}
+#if TH15_DIAGNOSTICS
+    if(uiTest&&testState){
+        // Explicit diagnostic accessibility lists must omit hidden controls;
+        // otherwise XCTest reports the hidden joystick as still hittable.
+        NSMutableArray* accessible=[NSMutableArray array];
+        if(!self.editingLayout)[accessible addObject:testState];
+        for(UIView* control in controls)if(!control.hidden)[accessible addObject:control];
+        if(self.editingLayout)[accessible addObject:self.layoutToolbar];
+        self.accessibilityElements=accessible;
+    }
+#endif
 }
 - (void)startLayoutEditing{
     [self releaseInputs];self.editingLayout=YES;self.layoutDraft=[NSMutableDictionary dictionary];for(NSString* key in @[@"layoutPortrait",@"layoutLandscape"]){NSDictionary* value=[NSUserDefaults.standardUserDefaults dictionaryForKey:touhou::ios::key(key)];if(value)self.layoutDraft[key]=[value mutableCopy];}
@@ -456,6 +467,7 @@ int main(int argc,char** argv){
             if(!strcmp(argv[i],"--character")&&i+1<argc)diagnosticCharacter=atoi(argv[++i]);
             if(!strcmp(argv[i],"--settings-smoke"))settingsSmoke=true;
             if(!strcmp(argv[i],"--ui-test"))uiTest=true;
+            if(!strcmp(argv[i],"--reset-native-settings"))touhou::ios::resetPreferences();
             if(!strcmp(argv[i],"--portrait-zoom"))touhou::ios::setPreference(@"portraitZoom",@YES);
         }
 #endif
