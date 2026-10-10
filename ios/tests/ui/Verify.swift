@@ -12,6 +12,12 @@ final class Verify: XCTestCase {
         }
         return -1
     }
+    func decimal(_ name: String) -> Double {
+        for word in state.label.split(separator: " ") {
+            if word.hasPrefix(name + "=") { return Double(word.split(separator: "=")[1]) ?? -1 }
+        }
+        return -1
+    }
     func image(_ name: String) {
         let capture = XCTAttachment(screenshot: app.screenshot())
         capture.name = name; capture.lifetime = .keepAlways; add(capture)
@@ -40,8 +46,10 @@ final class Verify: XCTestCase {
         XCTAssertTrue(state.waitForExistence(timeout: 90))
     }
     func testControlsSettingsAndRotation() {
-        launch(["--stage", "1"])
+        launch(["--stage", "1", "--reset-native-settings"])
+        app.launchArguments = ["--ui-test", "--stage", "1"]
         wait("width=768 height=1024")
+        let initialDeadZone = decimal("deadZone")
         XCTAssertTrue(app.otherElements["th15.joystick"].exists)
         image("TH15-portrait-fullscreen")
         let stick = app.otherElements["th15.joystick"]
@@ -55,7 +63,13 @@ final class Verify: XCTestCase {
         app.sliders["sensitivity"].adjust(toNormalizedSliderPosition: 0.7)
         image("TH15-settings")
         app.navigationBars["设置"].buttons.element(boundBy: 0).tap()
-        wait("deadZone=0.40")
+        // XCTest moves a real slider approximately; verify its applied range and persistence.
+        let adjusted = NSPredicate { _, _ in
+            let value = self.decimal("deadZone")
+            return abs(value - 0.4) <= 0.05 && abs(value - initialDeadZone) > 0.1
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: adjusted, object: state)], timeout: 60), .completed, state.label)
+        let savedDeadZone = decimal("deadZone")
         XCUIDevice.shared.orientation = .landscapeLeft
         wait("width=1024 height=768")
         image("TH15-landscape-fullscreen")
@@ -63,6 +77,7 @@ final class Verify: XCTestCase {
         wait("width=768 height=1024")
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["th15.settings"].waitForExistence(timeout: 60))
+        wait("deadZone=\(String(format: "%.2f", savedDeadZone))")
         app.buttons["th15.settings"].tap()
         XCTAssertTrue(app.navigationBars["设置"].waitForExistence(timeout: 30))
         XCTAssertEqual(app.sliders["deadZone"].value as? String, saved)
