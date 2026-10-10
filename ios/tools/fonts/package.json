@@ -1,0 +1,8 @@
+{
+  "name": "th15-private-font-preparation",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "koffi": "3.2.1"
+  }
+}

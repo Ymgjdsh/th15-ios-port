@@ -1,0 +1,7 @@
+# Simulator interface checks
+
+Build with `TH15_SDK=iphonesimulator TH15_DIAGNOSTICS=ON`, install the resulting app on a dedicated simulator, then run the `TH15Verify` scheme in this directory against that same device. Specify its UUID explicitly to avoid interacting with another project's simulator. `Verify.swift` covers native settings, joystick tracking, orientation, game menus, DEV, full-code keyboard input and persistent unlock, Auto Bomb preference, Z/S Toggle and control layout save/cancel/reset/persistence. Interface tests use diagnostic invulnerability and are not a full playthrough.
+
+For original Bomb-service collision checks, launch the diagnostic app with `--autobomb-checks`. It calls `PlayerCollision.circle` at the player position, checks all four original Bomb services and single-stock consumption, verifies subsequent protected contact does not consume again, and checks ordinary hits with the option off or no Bombs. Startup protection is explicitly removed immediately before each injected collision. Results are written to `Library/TH15/current.log` in the simulator data container. This is a collision-path integration check, not a natural bullet-pattern playthrough.
+
+For stage loading, `--regression` runs stages 1–7 with Reimu and stage 1 with each remaining character to 300 logic frames. All diagnostic arguments and test accessibility state are compiled out of the final device package. Native algorithm checks run with `bash ios/tools/native_checks.sh` on macOS.
