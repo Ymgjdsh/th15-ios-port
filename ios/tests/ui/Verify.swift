@@ -197,6 +197,40 @@ final class Verify: XCTestCase {
         XCTAssertEqual(element.frame.midX, frame.midX, accuracy: 3)
         XCTAssertEqual(element.frame.midY, frame.midY, accuracy: 3)
     }
+    func assertAspect(_ portraitBattle: Bool) {
+        let expected = portraitBattle ? 384.0 / 448.0 : 4.0 / 3.0
+        let predicate = NSPredicate { _, _ in
+            let w = self.decimal("viewW"), h = self.decimal("viewH")
+            return w > 0 && h > 0 && abs(w / h - expected) < 0.001
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: predicate, object: state)], timeout: 60), .completed, state.label)
+        XCTAssertEqual(decimal("viewW") / decimal("sourceW"), decimal("viewH") / decimal("sourceH"), accuracy: 0.002)
+    }
+    func testAspectAndTouch() {
+        launch(["--stage", "1", "--reset-native-settings"])
+        wait("context=1 "); assertAspect(true)
+        openSettings(); setSwitch("dragLimited", false); closeSettings(); wait("dragLimited=0")
+        assertAspect(true)
+        let scale = decimal("viewW") / 384.0, before = decimal("playerX")
+        let x = decimal("viewX") + decimal("viewW") * 0.5
+        let y = decimal("viewY") + decimal("viewH") * 0.45
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0)).withOffset(CGVector(dx: x, dy: y))
+        start.press(forDuration: 0.4, thenDragTo: start.withOffset(CGVector(dx: 30, dy: 0)), withVelocity: .slow, thenHoldForDuration: 2)
+        image("TH15-b7-portrait-battle")
+        let moved = NSPredicate { _, _ in abs(self.decimal("playerX") - before - 30.0 / scale) < 3 }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: moved, object: state)], timeout: 20), .completed, state.label)
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let landscape = NSPredicate { _, _ in self.decimal("width") > self.decimal("height") }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: landscape, object: state)], timeout: 60), .completed)
+        assertAspect(false); image("TH15-b7-landscape-battle")
+        app.terminate(); app.launchArguments = ["--ui-test"]; app.launch()
+        wait("scene=0 screen=1 sub=2"); assertAspect(false); image("TH15-b7-landscape-title")
+        XCUIDevice.shared.orientation = .portrait
+        let portrait = NSPredicate { _, _ in self.decimal("height") > self.decimal("width") }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: portrait, object: state)], timeout: 60), .completed)
+        assertAspect(false); image("TH15-b7-portrait-title")
+        app.terminate()
+    }
     func testAutoBombTogglesAndLayout() {
         launch(["--stage", "1", "--reset-native-settings"]); app.launchArguments=["--ui-test","--stage","1"]; wait("width=768 height=1024")
         openSettings(); setSwitch("autoFire", false); setSwitch("autoSlow", false)

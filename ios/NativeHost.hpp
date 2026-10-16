@@ -13,8 +13,7 @@ void sdl_touch_options(int,int,float);
 void sdl_touch_mode(unsigned);
 void sdl_touch_gestures(int,int);
 void sdl_touch_controls(int,int,unsigned,unsigned,float,float);
-void sdl_set_viewport(float,float,float,float);
-void sdl_set_portrait_header(float,float);
+void sdl_display_geometry(float,float,float,float,float,float);
 void sdl_display_options(bool,bool);
 bool sdl_zoom_active();
 bool sdl_controls_gameplay();
@@ -28,6 +27,7 @@ int sdl_unlock_code(const char*);
 bool sdl_test_stage(int,int);
 void sdl_test_protect();
 bool sdl_test_auto_bomb();
+bool sdl_test_reisen_drag();
 void sdl_test_key(unsigned,bool);
 const char* sdl_test_state();
 #endif

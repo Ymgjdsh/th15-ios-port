@@ -290,7 +290,7 @@ bool Renderer::commit(){
   // TH15 puts score/lives/bombs above y=176, then power/point/graze
   // below it. Reuse the actual game HUD, including its live fragments.
   blit({416,16,224,160},{r[0],r[1],r[2]*.5f,r[3]});
-  blit({416,176,224,144},{r[0]+r[2]*.5f,r[1],r[2]*.5f,r[3]});
+  blit({416,176,224,144},{r[0]+r[2]*.5f,r[1],r[2]*.5f,r[3]*(144.f/160.f)});
  }
 #ifdef TH15_IOS
  glBindRenderbuffer(GL_RENDERBUFFER,GLuint(SDL_GetNumberProperty(props,SDL_PROP_WINDOW_UIKIT_OPENGL_RENDERBUFFER_NUMBER,0)));

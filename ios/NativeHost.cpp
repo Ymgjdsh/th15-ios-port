@@ -1,6 +1,7 @@
 #include "NativeHost.hpp"
 #include "RuntimeClock.hpp"
 #include "Unlock.hpp"
+#include "PortraitLayout.hpp"
 #include "../th15_web/cpp/sdl/ApplicationState.hpp"
 #include "../th15_web/cpp/game/GameKeyboard.hpp"
 #include "../portable/input/TouchController.hpp"
@@ -21,6 +22,18 @@ std::unordered_map<SDL_FingerID,int> fingers;int next_finger=1;unsigned last_bom
 SDL_Gamepad* gamepad=nullptr;
 bool developer_enabled=false,developer_invincible=false;
 bool automatic_bombs=false;
+float display_width=640,display_height=480,display_left=0,display_top=0,display_right=0,display_bottom=0;
+#if TH15_DIAGNOSTICS
+unsigned test_pointer_events=0,test_pointer_downs=0;
+#endif
+void update_presentation(){
+ if(!app)return;
+ const bool portrait=sdl_zoom_active();
+ const auto layout=touhou::ios::displayLayout(display_width,display_height,display_left,display_top,display_right,display_bottom,portrait);
+ auto& backend=app->graphics.backend;backend.portraitHud=portrait;
+ backend.sourceRect=portrait?std::array<float,4>{32,16,384,448}:std::array<float,4>{0,0,640,480};
+ backend.displayRect=layout.playfield;backend.portraitHeader=layout.header;
+}
 void open_gamepad(){
  if(gamepad)return;int count=0;auto* ids=SDL_GetGamepads(&count);
  for(int i=0;i<count&&!gamepad;i++)gamepad=SDL_OpenGamepad(ids[i]);
@@ -52,6 +65,7 @@ touhou::input::TouchState state(){
  auto& stage=*app->scene();if(stage.messages.active()){s.context=2;return s;}
  auto& player=*stage.battle.player;auto& motion=player.motion;s.context=1;s.instance=app->progress.stage;
  s.ready=player.life.state==1&&!(app->progress.scene_flags&(4|0x70|0x4000|0x10000));
+ s.retain_drag=player.life.state==4&&!(app->progress.scene_flags&(4|0x70|0x4000|0x10000));
  s.x=motion.position.x;s.y=motion.position.y;s.fast=float(motion.normal_speed)/128;s.slow=float(motion.focus_speed)/128;
  s.min_x=-184;s.max_x=184;s.min_y=32;s.max_y=432;return s;
 }
@@ -62,10 +76,16 @@ void pump(){
   if(e.type==SDL_EVENT_WINDOW_FOCUS_LOST){sdl_keys_clear();if(!discard_focus_events)focus_lost=true;}
   if(e.type==SDL_EVENT_FINGER_CANCELED){gestures.cancel();fingers.erase(e.tfinger.fingerID);continue;}
   if(e.type==SDL_EVENT_FINGER_DOWN||e.type==SDL_EVENT_FINGER_MOTION||e.type==SDL_EVENT_FINGER_UP||e.type==SDL_EVENT_FINGER_CANCELED){
+#if TH15_DIAGNOSTICS
+   ++test_pointer_events;if(e.type==SDL_EVENT_FINGER_DOWN)++test_pointer_downs;
+#endif
    auto found=fingers.find(e.tfinger.fingerID);if(e.type==SDL_EVENT_FINGER_DOWN)found=fingers.emplace(e.tfinger.fingerID,next_finger++).first;
    if(found==fingers.end())continue;
    const auto r=app->graphics.backend.displayRect,c=app->graphics.backend.sourceRect;
    const float x=(e.tfinger.x-r[0])/r[2],y=(e.tfinger.y-r[1])/r[3];
+#if TH15_DIAGNOSTICS
+   std::fprintf(stderr,"POINTER type=%u raw=%.3f,%.3f mapped=%.3f,%.3f ready=%d mode=%d active=%d\n",e.type,e.tfinger.x,e.tfinger.y,x,y,state().ready,gestures.mode,gestures.active());
+#endif
    if(e.type!=SDL_EVENT_FINGER_DOWN||(x>=0&&x<=1&&y>=0&&y<=1))
     gestures.pointer(e.type==SDL_EVENT_FINGER_DOWN?0:e.type==SDL_EVENT_FINGER_MOTION?1:2,found->second,(c[0]+x*c[2])/640,(c[1]+y*c[3])/480,SDL_GetTicks(),state(),keys[16]);
    if(e.type==SDL_EVENT_FINGER_UP||e.type==SDL_EVENT_FINGER_CANCELED)fingers.erase(found);
@@ -91,9 +111,7 @@ bool tick(){
  app->touch={sample.motion,sample.x,sample.y};input.update(keyboard_keys(merged));
  const bool lost=focus_lost;focus_lost=false;
  const bool ok=app->step(input.held,input.pressed,input.repeated,60,lost);
- int w=0,h=0;SDL_GetWindowSize(SDL_GL_GetCurrentWindow(),&w,&h);
- app->graphics.backend.portraitHud=sdl_zoom_active();
- app->graphics.backend.sourceRect=app->graphics.backend.portraitHud?std::array<float,4>{32,16,384,448}:std::array<float,4>{0,0,640,480};
+ update_presentation();
  return ok;
 }
 }
@@ -102,7 +120,7 @@ void* sdl_window(){return SDL_GL_GetCurrentWindow();}
 const char* sdl_file_error(){return failure.c_str();}
 const std::int32_t* sdl_game_status(){static std::int32_t empty[16]{};return app?app->projection():empty;}
 void sdl_loop_start(void*){previous=-1;cadence.reset();}
-int sdl_loop_frame(double now){if(!app||paused)return 0;pump();const unsigned ticks=previous<0?1:cadence.advance(now-previous);previous=now;for(unsigned i=0;i<ticks;i++)if(!tick()){failure=app->failure;return app->exiting?1:2;}if(ticks)app->graphics.backend.commit();return 0;}
+int sdl_loop_frame(double now){if(!app||paused)return 0;update_presentation();pump();const unsigned ticks=previous<0?1:cadence.advance(now-previous);previous=now;for(unsigned i=0;i<ticks;i++)if(!tick()){failure=app->failure;return app->exiting?1:2;}if(ticks)app->graphics.backend.commit();return 0;}
 void sdl_loop_pause(int value){
  paused=value;touhou::ios::suspendClock(value);previous=-1;cadence.reset();sdl_keys_clear();
  // Native panels and UIKit lifecycle already suspend the complete game.
@@ -131,10 +149,9 @@ void sdl_touch_controls(int shoot,int slow,unsigned bomb,unsigned escape,float x
  previous_menu_x=dx;previous_menu_y=dy;
  gestures.controls(shoot,slow,bomb,escape+menu_escape,x,y);
 }
-void sdl_set_viewport(float x,float y,float w,float h){if(app)app->graphics.backend.displayRect={x,y,w,h};}
-void sdl_set_portrait_header(float top,float height){if(app)app->graphics.backend.portraitHeader={0,top,1,height};}
+void sdl_display_geometry(float w,float h,float left,float top,float right,float bottom){display_width=w;display_height=h;display_left=left;display_top=top;display_right=right;display_bottom=bottom;update_presentation();}
 void sdl_display_options(bool smooth,bool crop){zoom=crop;if(app)app->graphics.backend.smooth=smooth;}
-bool sdl_zoom_active(){int w=0,h=0;SDL_GetWindowSize(SDL_GL_GetCurrentWindow(),&w,&h);return zoom&&h>w&&app&&app->session&&app->scene()&&(!app->pause||app->pause->state.screen==PauseScreen::Inactive);}
+bool sdl_zoom_active(){return zoom&&display_height>display_width&&app&&app->session&&app->scene()&&(!app->pause||app->pause->state.screen==PauseScreen::Inactive);}
 bool sdl_controls_gameplay(){const auto context=state().context;return context==1||context==3;}
 void sdl_auto_bomb(bool enabled){automatic_bombs=enabled;}
 void sdl_developer_enabled(bool enabled){developer_enabled=enabled;if(!enabled)developer_invincible=false;}
@@ -183,9 +200,46 @@ bool sdl_test_auto_bomb(){
  if(!p.error.empty()||p.life.state!=4||b.session.bombs!=0){failure="Empty Bomb stock changed ordinary hit";return false;}
  return true;
 }
+bool sdl_test_reisen_drag(){
+ automatic_bombs=developer_invincible=false;
+ for(bool unlimited:{false,true}){
+  if(!sdl_test_stage(1,3))return false;
+  auto& b=app->scene()->battle;auto& p=*b.player;
+  gestures.enabled=true;gestures.mode=0;gestures.unlimited=unlimited;gestures.sensitivity=1;
+  gestures.double_tap=gestures.two_finger=false;gestures.controls(false,false,0,0,0,0);
+  for(int i=0;i<180;i++){p.life.invulnerability.set(600);if(!tick())return false;}
+  b.session.bombs=3;
+  if(!b.bomb->begin()){failure=b.bomb->error;return false;}
+  auto& shield=static_cast<BombReisen&>(*b.bomb);
+  float finger=.30f;gestures.pointer(0,701,finger,.6f,0,state(),false);
+  if(!gestures.active()){failure="Shield check could not begin drag";return false;}
+  for(int charge=3;charge>0;--charge){
+   for(int i=0;i<32;i++){p.life.invulnerability.set(600);if(!tick())return false;}
+   p.life.invulnerability.set(0);auto& c=p.frame.collision;c.state=1;c.invulnerability=0;c.bomb_active=false;
+   c.circle(c.position,1,false,&p);
+   if(p.life.state!=4){failure="Shield collision did not enter pending hit";return false;}
+   finger+=.005f;gestures.pointer(1,701,finger,.6f,1,state(),false);
+   if(!tick()||p.life.state!=1||shield.charges!=charge-1||!gestures.active()){
+    failure="Reisen shield recovery discarded the captured drag";return false;
+   }
+   const float before=p.motion.position.x;finger+=.015f;
+   gestures.pointer(1,701,finger,.6f,2,state(),false);
+   if(!tick()||p.motion.position.x<=before||p.motion.touch.mode!=(unlimited?2:1)){
+    failure="Held finger did not move Reisen after shield recovery";return false;
+   }
+  }
+  gestures.pointer(2,701,finger,.6f,3,state(),false);
+  if(gestures.active()){failure="Recovered drag did not release";return false;}
+  std::printf("REISEN DRAG PASS: %s, three real shield collisions, same finger resumes, release\n",unlimited?"unlimited":"limited");std::fflush(stdout);
+ }
+ return true;
+}
 void sdl_test_key(unsigned key,bool held){if(key<256)keys[key]=held;}
 const char* sdl_test_state(){
- static char text[512];const auto* p=sdl_game_status();const auto* battle=app&&app->scene()?&app->scene()->battle:nullptr;
- std::snprintf(text,sizeof text,"scene=%d screen=%d sub=%d cursor=%d music=%d binding=%d stageFrame=%d dev=%d invincible=%d score=%d power=%d lives=%d bombs=%d musicMask=%u extra=%d autoBomb=%d context=%d pause=%d ",p[0],p[8],p[9],p[10],app?app->volumes.music_volume:0,app?app->controller.values[0]:-1,p[5],developer_enabled,developer_invincible,battle?battle->score.score:0,battle?battle->session.power:0,battle?battle->session.extra_lives:0,battle?battle->session.bombs:0,app?app->records.music_mask():0,app&&app->records.title_records().extra_available(),automatic_bombs,state().context,p[14]);return text;
+ static char text[1024];const auto* p=sdl_game_status();const auto* battle=app&&app->scene()?&app->scene()->battle:nullptr;
+ std::snprintf(text,sizeof text,"scene=%d screen=%d sub=%d cursor=%d music=%d binding=%d stageFrame=%d dev=%d invincible=%d score=%d power=%d lives=%d bombs=%d musicMask=%u extra=%d autoBomb=%d context=%d pause=%d ",p[0],p[8],p[9],p[10],app?app->volumes.music_volume:0,app?app->controller.values[0]:-1,p[5],developer_enabled,developer_invincible,battle?battle->score.score:0,battle?battle->session.power:0,battle?battle->session.extra_lives:0,battle?battle->session.bombs:0,app?app->records.music_mask():0,app&&app->records.title_records().extra_available(),automatic_bombs,state().context,p[14]);
+ if(app){const auto& r=app->graphics.backend.displayRect;const auto& c=app->graphics.backend.sourceRect;
+  std::snprintf(text+std::strlen(text),sizeof(text)-std::strlen(text),"viewX=%.3f viewY=%.3f viewW=%.3f viewH=%.3f sourceW=%.0f sourceH=%.0f playerX=%.3f playerY=%.3f dragActive=%d ready=%d pointerEvents=%u pointerDowns=%u ",r[0]*display_width,r[1]*display_height,r[2]*display_width,r[3]*display_height,c[2],c[3],battle?battle->player->motion.position.x:0,battle?battle->player->motion.position.y:0,gestures.active(),state().ready,test_pointer_events,test_pointer_downs);}
+ return text;
 }
 #endif

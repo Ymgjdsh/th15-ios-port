@@ -7,7 +7,11 @@
 // adapter supplies game state and consumes movement; no score or stage rule
 // lives here. The original 60Hz game determines the actual movement distance.
 namespace touhou::input {
-struct TouchState {int context=0,instance=0;bool ready=false;float x=0,y=0,fast=0,slow=0,min_x=0,min_y=0,max_x=640,max_y=480;};
+struct TouchState {int context=0,instance=0;bool ready=false;float x=0,y=0,fast=0,slow=0,min_x=0,min_y=0,max_x=640,max_y=480;
+    // A pending hit can be cancelled by Reisen's barrier or a deathbomb.
+    // Keep an existing finger captured, without moving the blocked player.
+    bool retain_drag=false;
+};
 struct TouchSample {bool keys[256]{};int motion=0;float x=0,y=0;};
 class TouchController {
     struct Gesture {bool active=false;int id=0,count=0;float x=0,y=0,last_x=0,last_y=0;std::uint64_t start=0;};
@@ -38,14 +42,16 @@ public:
         }
         if(menu.active&&menu.id==id){menu.last_x=px;menu.last_y=py;return;}
         if(tap.active&&tap.id==id){const float dx=px-tap.x,dy=py-tap.y;if(dx*dx+dy*dy>576)tap_moved=true;}
-        if(id==primary){if(!dragging||s.context!=1||!s.ready||instance!=s.instance){clear_motion();return;}
+        if(id==primary){if(!dragging||s.context!=1||(!s.ready&&!s.retain_drag)||instance!=s.instance){clear_motion();return;}
+            if(!s.ready){previous_x=x;previous_y=y;target_x=s.x;target_y=s.y;return;}
             const bool slow=focus||(two_finger&&fingers.size()>1)||key_slow;const float scale=!unlimited&&slow&&s.fast?s.slow/s.fast:1;
             target_x=std::clamp(target_x+std::clamp((x-previous_x)*640,-640.f,640.f)*sensitivity*scale,s.min_x,s.max_x);
             target_y=std::clamp(target_y+std::clamp((y-previous_y)*480,-480.f,480.f)*sensitivity*scale,s.min_y,s.max_y);previous_x=x;previous_y=y;
         }
     }
     TouchSample sample(const TouchState& s,std::uint64_t now,bool key_slow,bool arrows){
-        TouchSample out;if(context!=s.context){cancel();context=s.context;}if(!s.ready||arrows)clear_motion();
+        TouchSample out;if(context!=s.context){cancel();context=s.context;}if((!s.ready&&!s.retain_drag)||arrows)clear_motion();
+        if(dragging&&!s.ready){target_x=s.x;target_y=s.y;}
         if(confirm_ticks>0){out.keys[90]=true;--confirm_ticks;}if(escape_ticks>0){out.keys[27]=true;--escape_ticks;}
         // Actions remain available while movement is blocked (deathbomb).
         // Consume the pulse every tick so a late press cannot wait for respawn.

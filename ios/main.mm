@@ -26,7 +26,7 @@ static bool smoke=false;
 #if TH15_DIAGNOSTICS
 static int diagnosticStage=0,diagnosticCharacter=0,regressionIndex=0;
 static bool regression=false,settingsSmoke=false,touchSmoke=false;
-static bool bombChecks=false;
+static bool bombChecks=false,reisenChecks=false;
 static bool uiTest=false;
 static UIAccessibilityElement* testState;
 #endif
@@ -198,32 +198,16 @@ static void buttonAppearance(UIButton* button,bool held){
         if(i<3)button.titleLabel.font=[UIFont systemFontOfSize:std::clamp(diameters[i]*.36,CGFloat(22),CGFloat(32)) weight:UIFontWeightSemibold];
     }
     const CGFloat width=self.bounds.size.width,height=self.bounds.size.height;
-    const bool portrait=height>=width;
-    if(!portrait){
-        // Landscape is full-screen; safe areas constrain controls only.
-        sdl_set_viewport(0,0,1,1);
-        [self applyControlLayout];return;
-    }
+    sdl_display_geometry(float(width),float(height),float(insets.left),float(insets.top),float(insets.right),float(insets.bottom));
     if(sdl_zoom_active()){
-        const auto layout=touhou::ios::portraitLayout(float(width),float(height),float(insets.top),float(self.window.screen.nativeScale));
+        const auto layout=touhou::ios::displayLayout(float(width),float(height),float(insets.left),float(insets.top),float(insets.right),float(insets.bottom),true);
         const auto& r=layout.playfield;
-        sdl_set_viewport(r[0],r[1],r[2],r[3]);
-        sdl_set_portrait_header(layout.header[1],layout.header[3]);
         // Utility controls float over the playfield; the original HUD is
         // left readable across the complete header width.
         self.buttons[3].center=CGPointMake(right-22,r[1]*height+30);
         self.buttons[4].center=CGPointMake(left+22,r[1]*height+30);
         self.buttons[5].center=CGPointMake(left+78,r[1]*height+30);
         [self applyControlLayout];return;
-    }
-    CGFloat ax=insets.left;
-    CGFloat ay=insets.top+56;
-    CGFloat aw=width-ax-insets.right;
-    CGFloat ah=height-ay-insets.bottom-200;
-    if(aw>0&&ah>0){
-        const CGFloat ratio=4./3.;
-        CGFloat gw=std::min(aw,ah*ratio),gh=gw/ratio;
-        sdl_set_viewport(float((ax+(aw-gw)/2)/width),float((ay+(ah-gh)/2)/height),float(gw/width),float(gh/height));
     }
     [self applyControlLayout];
 }
@@ -432,6 +416,11 @@ static void frame(void*){
             if(++diagnosticCharacter>=4){touhou::ios::diagnostic(@"AUTO BOMB PASS: four original character Bomb services via actual circle collision");pauseFor(touhou::ios::Lifecycle::stopped,true);return;}
             if(!sdl_test_stage(1,diagnosticCharacter)){touhou::ios::diagnostic(@"AUTO BOMB FAIL: %s",sdl_file_error());pauseFor(touhou::ios::Lifecycle::stopped,true);return;}
         }
+        if(reisenChecks&&sdl_game_status()[5]>=180){
+            const bool ok=sdl_test_reisen_drag();
+            touhou::ios::diagnostic(@"REISEN DRAG %s: %s",ok?"PASS":"FAIL",ok?"limited/unlimited, three shield hits per mode":sdl_file_error());
+            touhou::ios::diagnosticsFlush();pauseFor(touhou::ios::Lifecycle::stopped,true);return;
+        }
         if(regression||diagnosticStage)sdl_test_protect();
         if(settingsSmoke&&frames==120)[overlay down:overlay.buttons[4]];
         if(settingsSmoke&&frames==120){dispatch_after(dispatch_time(DISPATCH_TIME_NOW,2*NSEC_PER_SEC),dispatch_get_main_queue(),^{UIViewController* nav=overlay.window.rootViewController.presentedViewController;[[(UINavigationController*)nav topViewController] performSelector:@selector(done)];});}
@@ -463,6 +452,7 @@ int main(int argc,char** argv){
             if(!strcmp(argv[i],"--smoke"))smoke=true;
             if(!strcmp(argv[i],"--regression")){regression=smoke=true;diagnosticStage=1;}
             if(!strcmp(argv[i],"--autobomb-checks")){bombChecks=true;diagnosticStage=1;}
+            if(!strcmp(argv[i],"--reisen-drag-checks")){reisenChecks=true;diagnosticStage=1;diagnosticCharacter=3;}
             if(!strcmp(argv[i],"--stage")&&i+1<argc)diagnosticStage=atoi(argv[++i]);
             if(!strcmp(argv[i],"--character")&&i+1<argc)diagnosticCharacter=atoi(argv[++i]);
             if(!strcmp(argv[i],"--settings-smoke"))settingsSmoke=true;

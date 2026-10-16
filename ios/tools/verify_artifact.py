@@ -34,6 +34,7 @@ with zipfile.ZipFile(args.ipa) as archive:
         offset+=length
     assert deployment
     assert b'REGRESSION PASS' not in executable and b'--settings-smoke' not in executable
+    assert b'--autobomb-checks' not in executable and b'--reisen-drag-checks' not in executable
     for name,record in report['assets'].items():
         data=archive.read(root+'assets/'+name)
         assert len(data)==record['bytes'] and hashlib.sha256(data).hexdigest()==record['sha256'],name

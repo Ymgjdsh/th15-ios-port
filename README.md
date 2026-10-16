@@ -10,7 +10,7 @@ The iOS version adds:
 
 - iOS 14+ ARM64 support and an IPA for TrollStore or personal re-signing
 - Touch dragging with an optional original-speed limit, an analog joystick with adjustable dead zone, and Z / X / S buttons
-- Full-screen landscape and a full-screen portrait playfield with the original score panel moved above it
+- Aspect-correct landscape and portrait on iPhone/iPad, with the original score panel above the portrait playfield
 - Chinese native settings, Auto Bomb, Z Toggle, S Toggle and No Button
 - Freely draggable controls, with separate portrait and landscape layouts, save, reset and cancel
 - An optional DEV panel and permanent full unlock with the code `ymgjdsh`
@@ -47,20 +47,20 @@ bash ios/tools/fetch_dependencies.sh
 TH15_SDK=iphoneos TH15_DIAGNOSTICS=OFF bash ios/build_ios.sh
 python3 ios/tools/package_ipa.py \
   .local/build-iphoneos/RelWithDebInfo-iphoneos/th15.app \
-  dist/TH15-iOS14-Native-b6.ipa
+  dist/TH15-iOS14-Native-b7.ipa
 ```
 
 `TH15_BUILD_NUMBER`, `TH15_BUILD_JOBS`, `TH15_ASSETS`, `TH15_DEPENDENCIES` and `TH15_BUILD_DIR` override their defaults. SDL3 is pinned to 3.4.2 and checked against its archive hash. Set `TH15_SDK=iphonesimulator` for simulator builds. The IPA uses ad-hoc signing; ordinary installation requires personal Apple signing and provisioning. Runtime details and diagnostic builds are in [ios/README.md](ios/README.md).
 
 ## Controls
 
-Z shoots and confirms, X releases a Bomb and goes back, and S focuses. Move with the joystick or drag the playfield. The joystick keeps tracking the captured finger outside its circle. Double-tap Bomb and two-finger focus are configurable. Swipe to navigate menus, tap to confirm or advance dialogue, two-finger tap to return in menus, and use four fingers to pause in battle. Gear opens settings and the pause button pauses or returns.
+Z shoots and confirms, X releases a Bomb and goes back, and S focuses. Move with the joystick or drag the playfield. The joystick keeps tracking the captured finger outside its circle. An existing drag also survives Reisen barrier hits in both speed modes. Double-tap Bomb and two-finger focus are configurable. Swipe to navigate menus, tap to confirm or advance dialogue, two-finger tap to return in menus, and use four fingers to pause in battle. Gear opens settings and the pause button pauses or returns.
 
 Z Toggle and S Toggle keep shooting/focus active after release until the next tap. Opening a panel, pausing, rotating, or leaving gameplay clears the held actions. Menu buttons keep their normal behavior. No Button hides joystick/Z/X/S in combat, keeps gear/pause/DEV and gestures available, and restores menu controls. Enable automatic shooting separately when using No Button if desired.
 
 Auto Bomb is off by default. When an actual collision would hit a vulnerable active player, it invokes that character's original Bomb before hit sound/effects, consumes one Bomb, and preserves the original Bomb effects and invulnerability. It does not predict bullets or restore lost lives. No stock, dialogue, an active Bomb, replay playback, or other original Bomb restrictions prevent activation.
 
-Open **自由调整操作布局** in settings, then drag any control. Portrait and landscape are saved separately. Save commits the draft, reset clears the current orientation, and cancel discards changes. Editing keeps the game paused. **竖屏战斗全屏** controls the portrait score-header/playfield layout.
+Open **自由调整操作布局** in settings, then drag any control. Portrait and landscape are saved separately. Save commits the draft, reset clears the current orientation, and cancel discards changes. Editing keeps the game paused. **竖屏战斗全屏** controls the portrait score-header/playfield layout. The complete canvas retains 4:3 in menus and landscape; portrait combat retains the original 384:448 playfield and undistorted HUD columns. Content fits inside the safe area with letterboxing where necessary. Rendering and touch input use the same viewport.
 
 Enable **开发者功能** to show DEV during ordinary combat. Its panel offers invincibility, maximum score/items/power, lives/Bombs refill, maximize all, and clear bullets/lasers. Invincibility resets on restart. Enter `ymgjdsh` under **输入作弊码解锁全部内容** to save all characters' Extra, practice, spell records and music unlocks.
 
